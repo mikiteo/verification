@@ -1,4 +1,4 @@
-module filter #(
+module filter__coef #(
     parameter p_data_bw = 10,
     parameter p_win_size = 9
 )(
@@ -17,44 +17,69 @@ module filter #(
 
 );
 
+    logic [p_win_size - 1 : 0] filter_coef
     logic [p_data_bw + 10 -1 : 0] sum_of_coef;
-    logic [p_data_bw + 10 -4 -1 : 0] div_sum;
-    logic [p_data_bw -1 : 0] result;
+    logic [p_data_bw + 10 -1 : 0] abs_val; 
+    logic [p_data_bw + 10 -4 -1 : 0] result;
     logic [p_data_bw -1 : 0] result_ff;
 
 
     always_comb begin
         case (i_config)
+            
             2'b00: begin // Laplacian Kernel 1
-                sum_of_coef =           0 * i_dxi_in_data[0] + (-1) * i_dxi_in_data[1] + 0 * i_dxi_in_data[2] +
-                                        (-1) * i_dxi_in_data[3] + 4 * i_dxi_in_data[4] + (-1) * i_dxi_in_data[5] +
-                                        0 * i_dxi_in_data[6] + (-1) * i_dxi_in_data[7] + 0 * i_dxi_in_data[8];
+                filter_coef[0] =  0; filter_coef[1] = -1; filter_coef[2] =  0;
+                filter_coef[3] = -1; filter_coef[4] = 4;  filter_coef[5] = -1;
+                filter_coef[6] =  0; filter_coef[7] = -1; filter_coef[8] =  0;
             end 
             2'b01: begin // Laplacian Kernel 2
-                sum_of_coef =           (-1) * i_dxi_in_data[0] + (-1) * i_dxi_in_data[1] + (-1) * i_dxi_in_data[2] +
-                                        (-1) * i_dxi_in_data[3] + 8 * i_dxi_in_data[4] + (-1) * i_dxi_in_data[5] +
-                                        (-1) * i_dxi_in_data[6] + (-1) * i_dxi_in_data[7] + (-1) * i_dxi_in_data[8];
+                filter_coef[0] = -1; filter_coef[1] = -1; filter_coef[2] = -1;
+                filter_coef[3] = -1; filter_coef[4] = 8;  filter_coef[5] = -1;
+                filter_coef[6] = -1; filter_coef[7] = -1; filter_coef[8] = -1;
             end 
             2'b10: begin // Gaussian Filter
-                sum_of_coef =           1 * i_dxi_in_data[0] + 2 * i_dxi_in_data[1] + 1 * i_dxi_in_data[2] +
-                                        2 * i_dxi_in_data[3] + 4 * i_dxi_in_data[4] + 2 * i_dxi_in_data[5] +
-                                        1 * i_dxi_in_data[6] + 2 * i_dxi_in_data[7] + 1 * i_dxi_in_data[8];
+                filter_coef[0] = 1;  filter_coef[1] = 2;  filter_coef[2] = 1;
+                filter_coef[3] = 2;  filter_coef[4] = 4;  filter_coef[5] = 2;
+                filter_coef[6] = 1;  filter_coef[7] = 2;  filter_coef[8] = 1;
             end 
             2'b11: begin // Average Filter
-                sum_of_coef =           1 * i_dxi_in_data[0] + 1 * i_dxi_in_data[1] + 1 * i_dxi_in_data[2] +
-                                        1 * i_dxi_in_data[3] + 1 * i_dxi_in_data[4] + 1 * i_dxi_in_data[5] +
-                                        1 * i_dxi_in_data[6] + 1 * i_dxi_in_data[7] + 1 * i_dxi_in_data[8];
+                filter_coef[0] = 1;  filter_coef[1] = 1;  filter_coef[2] = 1;
+                filter_coef[3] = 1;  filter_coef[4] = 1;  filter_coef[5] = 1;
+                filter_coef[6] = 1;  filter_coef[7] = 1;  filter_coef[8] = 1;
             end 
         endcase
     end
 
-    assign  div_sum = sum_of_coef >>> 2;
+    genvar i;
+    generate
+        for (i = 0; i < p_win_size; ++i) begin
+            always_comb begin
+                abs_val = (i_dxi_in_data[i] * filter_coef[i]);
+
+                if (abs_val < 0) begin
+                    abs_val = -abs_val;
+                end
+
+                sum_of_coef = sum_of_coef + abs_val;
+            end
+        end
+    endgenerate
 
     always_comb begin
-        if (div_sum > 1023)
-            result = 1023;
-        else
-            result = div_sum;
+        case (i_config)
+            2'b00: begin
+                result = sum_of_coef >>> 2; 
+            end
+            2'b01: begin
+                result = sum_of_coef >>> 3; 
+            end
+            2'b10: begin
+                result = sum_of_coef >>> 4; 
+            end
+            2'b11: begin
+                result = (sum_of_coef >>> 3) + (sum_of_coef >>> 6); 
+            end
+        endcase
     end
 
     always @(posedge i_clk or negedge i_rstn) begin
@@ -72,4 +97,4 @@ module filter #(
     assign o_dxi_in_ready = i_dxi_out_ready;
     assign o_dxi_out_data = result_ff;
 
-endmodule  
+endmodule
