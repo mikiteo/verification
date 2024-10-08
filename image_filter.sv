@@ -1,4 +1,4 @@
-module filter__coef #(
+module image_filter #(
     parameter p_data_bw = 10,
     parameter p_win_size = 9
 )(
