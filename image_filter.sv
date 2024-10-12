@@ -1,4 +1,4 @@
-module filter__coef #(
+module image_filter #(
     parameter p_data_bw = 10,
     parameter p_win_size = 9
 )(
@@ -50,20 +50,18 @@ module filter__coef #(
         endcase
     end
 
-    genvar i;
-    generate
+    always_comb begin : 
+        sum_of_coef = 0;
         for (i = 0; i < p_win_size; ++i) begin
-            always_comb begin
-                abs_val = (i_dxi_in_data[i] * filter_coef[i]);
-
-                if (abs_val < 0) begin
-                    abs_val = -abs_val;
-                end
-
-                sum_of_coef = sum_of_coef + abs_val;
-            end
+            abs_val[i] = (i_dxi_in_data[i] * filter_coef[i]);
+            sum_of_coef = sum_of_coef + abs_val;
         end
-    endgenerate
+
+        if (sum_of_coef < 0) begin
+            abs_val - sum_of_coef;
+        end
+    end
+
 
     always_comb begin
         case (i_config)
